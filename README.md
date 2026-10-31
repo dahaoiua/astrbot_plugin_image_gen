@@ -101,6 +101,7 @@ git clone https://github.com/dahaoiua/astrbot_plugin_image_gen
 | `/draw_size 1024x768` | 切换本会话的分辨率，也支持 `16:9`、`9:16`、`1024`（正方形） |
 | `/draw_size default` | 恢复配置默认尺寸 |
 | `/draw_status` | 检查出图接口是否在线，顺带显示引擎版本和显存 |
+| `/draw_cache` | 清 ComfyUI 缓存：卸载模型释放显存 + 删残留的临时参考图 |
 
 模型和尺寸按**会话**记忆（存在 `data/plugin_data/astrbot_plugin_image_gen/sessions.json`），
 重启不掉；群里不同人/不同群可以各用各的。`generate_image` 工具不接收尺寸参数，模型即使传了 `width`/`height` 也会被忽略。
