@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import hashlib
 import json
 import re
 import time
@@ -61,6 +62,7 @@ INJECT_TEMPLATE = """【生图】可用 generate_image 工具画图。
 - 触发：用户要图、或明显需要配图时调用；一条回复最多一张。
 - 用户要「照着这张图 / 上一条图」画时，先调 describe_image_as_prompt 反推提示词，再把结果传给 generate_image；普通描述画图别多这一步。
 - 用户发图后要改这张图（"改成…""换成…""加个…"）时用 edit_image，直接传改法，不用先反推。
+- 消息里的 [图#12] 表示一张存下来的图：要改它/照着它反推时，把 12 传给 edit_image 或 describe_image_as_prompt 的 image_id。
 - 提示词结构（按序）：主体数量与身份, 外貌特征, 服装/状态, 动作/表情/互动, 环境/背景, 光影/氛围, 镜头/构图, 画质/风格。
 - 短语逗号分隔，不写完整句子，40~120 词；不编造用户没提的细节。
 - 关键特征加权：(词:1.2)，范围 0.5~1.5；弱化用 (词:0.8)。
@@ -68,6 +70,27 @@ INJECT_TEMPLATE = """【生图】可用 generate_image 工具画图。
 - 语言：{lang}
 - negative_prompt 只放用户要求排除的元素。
 - 不传尺寸；不改模型；出图后一两句话衔接，不复述提示词。"""
+
+def _lazy_ref_path(umo: str, image_id: int) -> str:
+    """按编号从懒加载插件的库里取图（同一个 plugin_data 根目录）。"""
+    base = Path(get_astrbot_plugin_data_path()) / "astrbot_plugin_lazy_image"
+    key = hashlib.sha1((umo or "default").encode("utf-8")).hexdigest()[:16]
+    idx = base / key / "index.json"
+    if not idx.is_file():
+        return ""
+    try:
+        data = json.loads(idx.read_text(encoding="utf-8"))
+    except Exception:
+        return ""
+    for item in data.get("items", []):
+        try:
+            if int(item.get("id", -1)) == int(image_id):
+                path = base / key / str(item.get("file") or "")
+                return str(path) if path.is_file() else ""
+        except (TypeError, ValueError):
+            continue
+    return ""
+
 
 MODEL_LABELS = {
     "zimage": "Z-Image Turbo",
@@ -434,16 +457,23 @@ class ImageGenPlugin(Star):
         event: AstrMessageEvent,
         prompt: str,
         negative_prompt: str | None = None,
+        image_id: int = 0,
     ) -> str:
         """按用户的话改一张图（图生图）：用户发图后说「改成…」「换成…」「加个…」时用。
 
         Args:
             prompt(string): 具体怎么改，例如"把背景换成夜晚的街道""把裙子改成红色""给她加一顶帽子"
             negative_prompt(string): 可选，不要出现的元素
+            image_id(int): 可选，消息里 [图#12] 的编号；改旧图时用它，不传就用当前消息/引用的图
         """
         if not self._bool("enable_tool", True):
             return "生图功能当前已关闭，直接回答用户即可。"
-        refs = await self._collect_reference_images(event)
+        refs = []
+        if image_id:
+            picked = _lazy_ref_path(getattr(event, "unified_msg_origin", "") or "", image_id)
+            refs = [picked] if picked else []
+        if not refs:
+            refs = await self._collect_reference_images(event)
         if not refs:
             return "没找到要改的图：让用户先发一张图，或者引用那张图再试。"
         src = Path(refs[0])
@@ -533,6 +563,7 @@ class ImageGenPlugin(Star):
         self,
         event: AstrMessageEvent,
         hint: str | None = None,
+        image_id: int = 0,
     ) -> str:
         """把用户刚发的图片（或引用的图片）反推成一段可直接生图的专业提示词。
 
@@ -540,8 +571,14 @@ class ImageGenPlugin(Star):
 
         Args:
             hint(string): 可选，用户对这张图的额外要求，比如"只要人物""换成夜景"
+            image_id(int): 可选，消息里 [图#12] 的编号；指旧图时用它，不传就用当前消息/引用的图
         """
-        refs = await self._collect_reference_images(event)
+        refs = []
+        if image_id:
+            picked = _lazy_ref_path(getattr(event, "unified_msg_origin", "") or "", image_id)
+            refs = [picked] if picked else []
+        if not refs:
+            refs = await self._collect_reference_images(event)
         if not refs:
             return "没找到可反推的图片：让用户先发一张图，或者引用那张图再试。"
 
