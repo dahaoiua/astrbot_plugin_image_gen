@@ -107,6 +107,18 @@
     "type": "text",
     "default": ""
   },
+  "prompt_t2i": {
+    "description": "文生图提示词规则",
+    "hint": "留空=用内置的官方写法（一段连贯描述：媒介→主体→动作→关系→构图→光线→材质→文字）",
+    "type": "text",
+    "default": ""
+  },
+  "prompt_edit": {
+    "description": "图生图提示词规则",
+    "hint": "留空=用内置的官方写法（第一句说改什么，保留项一句带过）",
+    "type": "text",
+    "default": ""
+  },
   "reverse_prompt_provider": {
     "description": "反推提示词用的视觉模型",
     "hint": "留空=用 provider_settings 里的 default_image_caption_provider_id（现为 deepseek/deepseek-flash）；也可填别的 provider ID",
