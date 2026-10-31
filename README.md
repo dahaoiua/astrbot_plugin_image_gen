@@ -1,6 +1,6 @@
 # astrbot_plugin_image_gen
 
-给 AstrBot 用的**通用文生图插件**：聊天时由 LLM 自己判断要不要配图，需要就先优化提示词，再调出图接口画图，直接发到会话里。
+给 AstrBot 用的**通用绘图插件**：文生图（`generate_image`）、图生图（`edit_image`）、照图反推提示词（`describe_image_as_prompt`）。聊天时由 LLM 自己判断要不要画、要不要改，直接发到会话里。
 
 "通用"指的是：
 
