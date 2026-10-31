@@ -66,17 +66,26 @@ INJECT_COMMON = """【生图】可用 generate_image（文生图）和 edit_imag
 - negative_prompt 只放用户要求排除的元素。
 - 不传尺寸；不改模型；出图后一两句话衔接，不复述提示词。"""
 
-T2I_SPEC = """【文生图提示词】像「正在看着成品图的人」那样，用一段连贯的话描述最终画面，不要堆关键词、不要对模型下指令。
-- 顺序：媒介（照片/海报/插画）→ 主体 → 动作 → 关系 → 构图 → 光线 → 材质 → 画面里的文字。
-- 用户明确要求的文字、数量、颜色、位置原样保留；没提到的背景、光线、氛围自己补合理值。
-- 画面里要出现的具体文字用引号括起来，说明它的位置和层级。
-- 每个属性紧跟它描述的对象，不要堆到句尾。
+T2I_SPEC = """【文生图提示词】（Qwen-Image 官方写法）
+用一段连贯英文写「正在看着成品图的人」的描述，不是关键词堆砌，也不是对模型下指令。
+
+- 开头句（约 20 词）：The image is a [vertical/wide/square] [realistic/cinematic/minimalist/...] [photograph/poster/illustration/...] of [subject], [background and palette].
+- 之后按序展开：medium → subject → action → relationships → composition → lighting → materials → exact lettering
+- 用户明确要求的文字、数量、颜色、位置原样保留；没提到的背景、光线、氛围自己补合理值
+- 画面里要出现的具体文字用引号括起来并交代位置，例如：a cream headline at the top reads exactly "TAKE THE SCENIC ROUTE"
+- 比例属于 wh_ratio 字段，不要写进正文；也不要写分辨率
+- 每个属性紧跟它描述的对象，不要堆到句尾
+- 要透明底时用固定句式：This is an RGBA image with transparency. [subject]. The image has alpha channel and the background is transparent.
 - 语言：{lang}"""
 
-EDIT_SPEC = """【图生图提示词】第一句直接说改什么，用动词点明对象和区域；要保留的部分一句带过。
-- 句式：把 [某处] 改成 [什么样]，其余保持不变。
-- 不要先描述成品画面，也不要细写不需要改的部分。
+EDIT_SPEC = """【图生图提示词】（Qwen-Image 官方模板）
+第一句直接说改什么，动词点明对象与区域；保留项一句带过。直接套这个模板：
+Edit. [具体改动指令]. Requested change: [instruction]. Preserve unrelated content and the image's framing. Keep the subject's identity and visual style consistent.
+
+- 不要先描述成品画面；不要细写不需要改的部分
+- 多张参考图时按顺序引用 first image / second image
 - 语言：{lang}"""
+
 
 
 def _lazy_ref_path(umo: str, image_id: int) -> str:
@@ -106,18 +115,18 @@ MODEL_LABELS = {
     "qwen_image": "Qwen-Image 2.1",
 }
 
-# 两条语言规则：Krea2 强调英文（允许中文文字），其它模型中英混合
-LANG_RULE_KREA2 = "英文。画面里要出现中文文字时，把中文原样写上。"
-LANG_RULE_MIXED = "中英混合，中国特有元素用中文原词，技术描述用英文。"
+# 语言规则：默认全英文，只有中国特有元素和画面里要原样出现的中文才用中文
+LANG_RULE = "全英文。只有两种情况用中文：①中国特有的元素（人名地名、朝代、服饰、建筑、纹样、画风）；②画面里要原样出现的中文文字。"
 
 # 反推提示词：让视觉模型直接产出「能直接生图的提示词」，不要先描述再改写
-REVERSE_INSTRUCTION = """你是文生图提示词工程师。看清楚这张图，用一段连贯的话把它写成一句能直接送进文生图模型的提示词——像在描述一张已经画好的成品。
+REVERSE_INSTRUCTION = """你是文生图提示词工程师。看清楚这张图，用一段连贯的英文把画面写成能直接送进文生图模型的提示词——像在描述一张已经画好的成品（Qwen-Image 官方写法）。
 
 只输出提示词本身，不要前言、不要"这是一张…"这类解释。
 
 要求：
-- 顺序：媒介（照片/插画/海报）→ 主体 → 动作 → 关系 → 构图 → 光线 → 材质 → 画面里的文字
-- 图里出现的具体文字用引号括起来，说明位置
+- 开头句约 20 词：The image is a [vertical/wide/square] [realistic/cinematic/minimalist/...] [photograph/poster/illustration/...] of [subject], [background and palette].
+- 之后按序展开：medium → subject → action → relationships → composition → lighting → materials → exact lettering
+- 图里出现的具体文字用引号括起来并交代位置
 - 不要堆关键词，不要写尺寸或分辨率
 - 语言：{lang}"""
 
@@ -628,7 +637,7 @@ class ImageGenPlugin(Star):
             model = self._current_model(event)
             w, h = self._current_size(event)
             label = MODEL_LABELS.get(model) or (model or "后端默认")
-            rule = LANG_RULE_KREA2 if model == "krea2" else LANG_RULE_MIXED
+            rule = LANG_RULE
             t2i = self._str("prompt_t2i", "").strip() or T2I_SPEC.format(lang=rule)
             edit = self._str("prompt_edit", "").strip() or EDIT_SPEC.format(lang=rule)
             text = "\n\n".join([INJECT_COMMON, t2i, edit])
