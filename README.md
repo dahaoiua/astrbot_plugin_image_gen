@@ -39,6 +39,8 @@ traditional Chinese ink painting, misty morning light, ultra detailed, 8k
 
 用户发图后说「改成…」「换成…」时，LLM 调 `edit_image`，插件把图 base64 传给后端 `edit_model`（默认 `qwen_lora_edit`）。
 
+改历史图时传 `image_id`（即消息里的 `[图#12]`），插件从懒加载插件的库里取原图；`describe_image_as_prompt` 同理。
+
 - 参考图来源：当前消息的图优先，没有就用引用消息的图
 - 后端会先等比缩小参考图（长边 > 1024 才缩），出图尺寸跟随参考图
 - 实测：768×1024 出图，本地约 40 秒，经隧道约 60 秒
