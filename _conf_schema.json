@@ -1,0 +1,169 @@
+{
+  "api_base": {
+    "description": "出图接口地址",
+    "hint": "默认走 SSH 反向隧道，服务器上直接用 http://127.0.0.1:8190；换成别的后端只要实现 GET /healthz 和 GET /generate -> image/png",
+    "type": "string",
+    "default": "http://127.0.0.1:8190"
+  },
+  "api_timeout": {
+    "description": "接口超时（秒）",
+    "hint": "单张一般 10~20 秒，首次加载模型会慢一些，建议 120 以上",
+    "type": "int",
+    "default": 300
+  },
+  "api_user": {
+    "description": "Basic Auth 用户名（可选）",
+    "hint": "只有出图接口在公网域名后面才需要；走 127.0.0.1 隧道不用填",
+    "type": "string",
+    "default": ""
+  },
+  "api_password": {
+    "description": "Basic Auth 密码（可选）",
+    "hint": "配合上面的用户名使用",
+    "type": "string",
+    "default": ""
+  },
+  "default_model": {
+    "description": "默认模型",
+    "hint": "留空=用后端默认（moss）。可选 zimage / krea2 / qwen_image / qwen_turbo / moss，聊天里用 /draw_model 临时切",
+    "type": "string",
+    "default": "moss"
+  },
+  "edit_model": {
+    "description": "图生图用的 profile",
+    "hint": "用户发图让你改的时候用的后端 profile，默认 qwen_edit（图生图）",
+    "type": "string",
+    "default": "qwen_edit"
+  },
+  "default_size": {
+    "description": "默认尺寸",
+    "hint": "支持 768x1024、1024x1024、16:9、1024 这几种写法；聊天里用 /draw_size 临时切",
+    "type": "string",
+    "default": "768x1024"
+  },
+  "default_width": {
+    "description": "默认宽度",
+    "hint": "仅当「默认尺寸」留空时作为兜底",
+    "type": "int",
+    "default": 768
+  },
+  "default_height": {
+    "description": "默认高度",
+    "hint": "8 的倍数",
+    "type": "int",
+    "default": 1024
+  },
+  "default_steps": {
+    "description": "默认采样步数",
+    "hint": "0 = 用该模型自带的默认步数（zimage/krea2 8 步，qwen_image 25 步）；填了就全局覆盖",
+    "type": "int",
+    "default": 0
+  },
+  "default_cfg": {
+    "description": "默认 CFG",
+    "hint": "蒸馏/加速类模型靠 cfg=1 出图，此时反向提示词不参与计算；实测调到 3 会明显崩图，建议保持 1.0。普通模型可以试 5~7",
+    "type": "float",
+    "default": 1.0
+  },
+  "max_prompt_chars": {
+    "description": "提示词最大长度",
+    "hint": "内置画质词也算在里面，超长会在逗号处截断",
+    "type": "int",
+    "default": 1800
+  },
+  "quality_enabled": {
+    "description": "启用内置画质提示词",
+    "hint": "关掉后只送 LLM 给的提示词",
+    "type": "bool",
+    "default": true
+  },
+  "quality_positive": {
+    "description": "正向画质提示词",
+    "hint": "追加在 LLM 提示词后面，逗号分隔；已经包含的词不会重复添加",
+    "type": "text",
+    "default": "masterpiece, best quality, ultra detailed, sharp focus, cinematic lighting, beautiful composition, high dynamic range"
+  },
+  "quality_negative": {
+    "description": "反向画质提示词",
+    "hint": "作为 negative_prompt 送给接口。注意：cfg=1 的蒸馏模型不跑 CFG，反向词实际不参与采样，仅作兼容保留",
+    "type": "text",
+    "default": "lowres, blurry, jpeg artifacts, watermark, text, signature, logo, worst quality, low quality, deformed, bad anatomy, bad hands, extra fingers, cropped"
+  },
+  "enable_tool": {
+    "description": "注册 generate_image 工具",
+    "hint": "关掉后 LLM 不能再自己决定画图，只能用 /draw 命令",
+    "type": "bool",
+    "default": true
+  },
+  "inject_prompt": {
+    "description": "注入使用说明",
+    "hint": "每次 LLM 请求前把「什么时候该画图、提示词怎么写（中英混合）」塞进 system_prompt",
+    "type": "bool",
+    "default": true
+  },
+  "inject_text": {
+    "description": "自定义注入文本",
+    "hint": "留空用内置说明；填了就整段替换",
+    "type": "text",
+    "default": ""
+  },
+  "reverse_prompt_provider": {
+    "description": "反推提示词用的视觉模型",
+    "hint": "留空=用 provider_settings 里的 default_image_caption_provider_id（现为 deepseek/deepseek-flash）；也可填别的 provider ID",
+    "type": "string",
+    "default": ""
+  },
+  "enable_marker": {
+    "description": "启用备用标记触发",
+    "hint": "给不支持工具调用的模型用：让它输出 [DRAW] 提示词，插件在发送前把这一行换成图片",
+    "type": "bool",
+    "default": false
+  },
+  "marker_token": {
+    "description": "备用标记",
+    "hint": "默认 [DRAW]，一般不用改",
+    "type": "string",
+    "default": "[DRAW]"
+  },
+  "cooldown_seconds": {
+    "description": "同一会话冷却时间（秒）",
+    "hint": "两次出图之间的最小间隔，0 表示不限制",
+    "type": "int",
+    "default": 15
+  },
+  "max_per_hour": {
+    "description": "同一会话每小时上限",
+    "hint": "防止刷图把显存和队列占满，0 表示不限制",
+    "type": "int",
+    "default": 30
+  },
+  "caption_enabled": {
+    "description": "图片前附带文字说明",
+    "type": "bool",
+    "default": false
+  },
+  "caption_template": {
+    "description": "说明文字模板",
+    "hint": "可用占位符：{prompt} {seed} {width} {height} {duration}",
+    "type": "string",
+    "default": "🎨 {prompt}"
+  },
+  "keep_days": {
+    "description": "生成图片保留天数",
+    "hint": "存到 data/plugin_data/astrbot_plugin_image_gen/images，0 表示不清理",
+    "type": "int",
+    "default": 7
+  },
+  "allowed_sessions": {
+    "description": "只允许这些会话使用",
+    "hint": "填 unified_msg_origin（形如 aiocqhttp:GroupMessage:123456），留空表示全部允许；支持部分匹配",
+    "type": "list",
+    "default": []
+  },
+  "blocked_sessions": {
+    "description": "禁止这些会话使用",
+    "hint": "同上，优先级高于白名单",
+    "type": "list",
+    "default": []
+  }
+}
