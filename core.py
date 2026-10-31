@@ -200,6 +200,12 @@ class ImageApiClient:
         with resp:
             return json.loads(resp.read().decode("utf-8"))
 
+    def clear_cache(self) -> dict:
+        """让后端清 ComfyUI 缓存：卸载模型 + 删残留的临时参考图（/cache/clear）。"""
+        resp = self._post_json("/cache/clear", {}, accept="application/json")
+        with resp:
+            return json.loads(resp.read().decode("utf-8"))
+
     def generate(
         self,
         prompt: str,
