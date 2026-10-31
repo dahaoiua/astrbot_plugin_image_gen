@@ -57,19 +57,27 @@ except ImportError:  # 直接按脚本方式加载时退化成绝对导入
 
 PLUGIN_NAME = "astrbot_plugin_image_gen"
 
-# 注入给 LLM 的使用说明（可在配置里整段替换）。{lang} 按当前模型替换成唯一一条语言规则。
-INJECT_TEMPLATE = """【生图】可用 generate_image 工具画图。
-- 触发：用户要图、或明显需要配图时调用；一条回复最多一张。
+# 注入给 LLM 的使用说明。{lang} 按当前模型替换成唯一一条语言规则。
+# 文生图 / 图生图各有一套写法（可在配置里分别替换 prompt_t2i / prompt_edit）。
+INJECT_COMMON = """【生图】可用 generate_image（文生图）和 edit_image（图生图改图）；一条回复最多一张。
+- 触发：用户要图、或明显需要配图时用 generate_image；用户发图后说"改成…""换成…""加个…"时用 edit_image。
 - 用户要「照着这张图 / 上一条图」画时，先调 describe_image_as_prompt 反推提示词，再把结果传给 generate_image；普通描述画图别多这一步。
-- 用户发图后要改这张图（"改成…""换成…""加个…"）时用 edit_image，直接传改法，不用先反推。
-- 消息里的 [图#12] 表示一张存下来的图：要改它/照着它反推时，把 12 传给 edit_image 或 describe_image_as_prompt 的 image_id。
-- 提示词结构（按序）：主体数量与身份, 外貌特征, 服装/状态, 动作/表情/互动, 环境/背景, 光影/氛围, 镜头/构图, 画质/风格。
-- 短语逗号分隔，不写完整句子，40~120 词；不编造用户没提的细节。
-- 关键特征加权：(词:1.2)，范围 0.5~1.5；弱化用 (词:0.8)。
-- 必带镜头/视角/景深词：cowboy shot、from below:0.8、dutch angle、depth of field。
-- 语言：{lang}
+- 消息里的 [图#12] 表示一张存下来的图：要改它/照着它反推时，把 12 传给对应工具的 image_id。
 - negative_prompt 只放用户要求排除的元素。
 - 不传尺寸；不改模型；出图后一两句话衔接，不复述提示词。"""
+
+T2I_SPEC = """【文生图提示词】像「正在看着成品图的人」那样，用一段连贯的话描述最终画面，不要堆关键词、不要对模型下指令。
+- 顺序：媒介（照片/海报/插画）→ 主体 → 动作 → 关系 → 构图 → 光线 → 材质 → 画面里的文字。
+- 用户明确要求的文字、数量、颜色、位置原样保留；没提到的背景、光线、氛围自己补合理值。
+- 画面里要出现的具体文字用引号括起来，说明它的位置和层级。
+- 每个属性紧跟它描述的对象，不要堆到句尾。
+- 语言：{lang}"""
+
+EDIT_SPEC = """【图生图提示词】第一句直接说改什么，用动词点明对象和区域；要保留的部分一句带过。
+- 句式：把 [某处] 改成 [什么样]，其余保持不变。
+- 不要先描述成品画面，也不要细写不需要改的部分。
+- 语言：{lang}"""
+
 
 def _lazy_ref_path(umo: str, image_id: int) -> str:
     """按编号从懒加载插件的库里取图（同一个 plugin_data 根目录）。"""
@@ -103,15 +111,14 @@ LANG_RULE_KREA2 = "英文。画面里要出现中文文字时，把中文原样�
 LANG_RULE_MIXED = "中英混合，中国特有元素用中文原词，技术描述用英文。"
 
 # 反推提示词：让视觉模型直接产出「能直接生图的提示词」，不要先描述再改写
-REVERSE_INSTRUCTION = """你是文生图提示词工程师。看清楚这张图，直接输出一段能送进文生图模型的提示词。
+REVERSE_INSTRUCTION = """你是文生图提示词工程师。看清楚这张图，用一段连贯的话把它写成一句能直接送进文生图模型的提示词——像在描述一张已经画好的成品。
 
-只输出提示词本身，不要前言、不要"这是一张…"这类描述句、不要解释。
+只输出提示词本身，不要前言、不要"这是一张…"这类解释。
 
 要求：
-- 结构按序：主体数量与身份, 外貌特征, 服装/状态, 动作/表情/互动, 环境/背景, 光影/氛围, 镜头/构图, 画质/风格
-- 短语逗号分隔，40~120 个词
-- 关键特征加权重：(词:1.2)，需要强调的用 1.1~1.3，弱化的用 0.8
-- 必须写镜头/视角/景深词（例如 cowboy shot、from below:0.8、dutch angle、depth of field）
+- 顺序：媒介（照片/插画/海报）→ 主体 → 动作 → 关系 → 构图 → 光线 → 材质 → 画面里的文字
+- 图里出现的具体文字用引号括起来，说明位置
+- 不要堆关键词，不要写尺寸或分辨率
 - 语言：{lang}"""
 
 
@@ -622,7 +629,9 @@ class ImageGenPlugin(Star):
             w, h = self._current_size(event)
             label = MODEL_LABELS.get(model) or (model or "后端默认")
             rule = LANG_RULE_KREA2 if model == "krea2" else LANG_RULE_MIXED
-            text = INJECT_TEMPLATE.format(lang=rule)
+            t2i = self._str("prompt_t2i", "").strip() or T2I_SPEC.format(lang=rule)
+            edit = self._str("prompt_edit", "").strip() or EDIT_SPEC.format(lang=rule)
+            text = "\n\n".join([INJECT_COMMON, t2i, edit])
             text += f"\n当前模型：{label}，{w}x{h}"
         marker_on = self._bool("enable_marker", False)
         marker = self._str("marker_token", "[DRAW]").strip() or "[DRAW]"
