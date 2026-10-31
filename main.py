@@ -776,6 +776,25 @@ class ImageGenPlugin(Star):
         self._set_override(event, size=f"{w}x{h}")
         yield event.plain_result(f"已切换到 {w}x{h}。")
 
+    @filter.command("draw_cache")
+    async def cmd_cache(self, event: AstrMessageEvent):
+        """清理 ComfyUI 缓存：卸载模型、删残留的临时参考图。"""
+        event.stop_event()
+        try:
+            info = await asyncio.to_thread(self._client().clear_cache)
+        except Exception as exc:
+            yield event.plain_result(f"清理失败：{exc}")
+            return
+        info = info or {}
+        unloaded = "是" if info.get("unloaded") else "否"
+        before = info.get("vram_before", -1)
+        after = info.get("vram_after", -1)
+        vram = f"，显存 {before}→{after} MiB" if before >= 0 and after >= 0 else ""
+        yield event.plain_result(
+            f"已清理：卸载模型={unloaded}，"
+            f"删临时参考图 {info.get('removed_files', 0)} 个（{info.get('freed_mb', 0)} MB）{vram}"
+        )
+
     @filter.command("draw_status")
     async def cmd_status(self, event: AstrMessageEvent):
         """检查出图接口是否在线。"""
