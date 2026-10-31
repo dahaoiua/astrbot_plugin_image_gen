@@ -1,10 +1,12 @@
 name: astrbot_plugin_image_gen
-display_name: 文生图
-desc: 让 LLM 自己决定要不要配图：调可配置的出图接口（默认本机 ComfyUI），提示词中英混合、自带质量词
+display_name: 绘图
+desc: 文生图 / 图生图 / 照图反推提示词，调可配置的出图接口（默认本机 ComfyUI）
 help: |
   /draw <描述>      手动生成一张图
+  /draw_model       切换模型，/draw_size 切换尺寸
   /draw_status      查看出图接口与显存状态
-  平时不用敲命令：聊天时 LLM 会自己判断要不要配图，需要时先优化提示词（中英混合，中国元素保留中文）再调用 generate_image。
+  工具：generate_image（文生图）、edit_image（图生图改图）、describe_image_as_prompt（照图反推提示词）。
+  平时不用敲命令：聊天时 LLM 会自己判断要不要画、要不要改图。
 version: v1.0.0
 author: dahaoiua
 repo: https://github.com/dahaoiua/astrbot_plugin_image_gen
