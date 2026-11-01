@@ -63,6 +63,7 @@ INJECT_COMMON = """【生图】可用 generate_image（文生图）和 edit_imag
 - 触发：用户要图、或明显需要配图时用 generate_image；用户发图后说"改成…""换成…""加个…"时用 edit_image。
 - 用户要「照着这张图 / 上一条图」画时，先调 describe_image_as_prompt 反推提示词，再把结果传给 generate_image；普通描述画图别多这一步。
 - 消息里的 [图#12] 表示一张存下来的图：要改它/照着它反推时，把 12 传给对应工具的 image_id。
+- 用户说「刚才那张」「这张图」或者直接下调图指令（加景深/压暗角/换背景/增强质感）时：调 edit_image 且**不要传 image_id**（默认改最近一张，也就是你刚发出去的那张）；只有用户明确指向更早的某张图时才用编号。
 - negative_prompt 只放用户要求排除的元素。
 - 不传尺寸；不改模型；出图后一两句话衔接，不复述提示词。"""
 
@@ -96,6 +97,59 @@ Edit. [具体改动指令]. Requested change: [instruction]. Preserve unrelated 
 - 多张参考图时按顺序引用 first image / second image
 - 语言：{lang}"""
 
+
+
+def _lazy_store_dir(umo: str) -> Path:
+    base = Path(get_astrbot_plugin_data_path()) / "astrbot_plugin_lazy_image"
+    key = hashlib.sha1((umo or "default").encode("utf-8")).hexdigest()[:16]
+    return base / key
+
+
+def _lazy_latest_path(umo: str) -> str:
+    """懒加载库里最近一张图（通常是机器人刚发出去的那张）。"""
+    sdir = _lazy_store_dir(umo)
+    idx = sdir / "index.json"
+    if not idx.is_file():
+        return ""
+    try:
+        data = json.loads(idx.read_text(encoding="utf-8"))
+    except Exception:
+        return ""
+    items = data.get("items") or []
+    if not items:
+        return ""
+    path = sdir / str(items[-1].get("file") or "")
+    return str(path) if path.is_file() else ""
+
+
+def _lazy_register(umo: str, path: str, width: int = 0, height: int = 0) -> int:
+    """把刚出的图登记进懒加载库，这样「刚才那张」有编号可用。返回编号，失败返回 0。"""
+    src = Path(path)
+    raw = src.read_bytes()
+    sha = hashlib.sha256(raw).hexdigest()
+    sdir = _lazy_store_dir(umo)
+    sdir.mkdir(parents=True, exist_ok=True)
+    idx = sdir / "index.json"
+    data = {"last_id": 0, "items": []}
+    if idx.is_file():
+        try:
+            data = json.loads(idx.read_text(encoding="utf-8"))
+        except Exception:
+            data = {"last_id": 0, "items": []}
+    for item in data.get("items", []):
+        if item.get("sha") == sha:
+            return int(item.get("id", 0))
+    new_id = int(data.get("last_id", 0)) + 1
+    name = f"{new_id}{src.suffix or '.png'}"
+    (sdir / name).write_bytes(raw)
+    data["last_id"] = new_id
+    data.setdefault("items", []).append({
+        "id": new_id, "file": name, "sha": sha,
+        "w": int(width or 0), "h": int(height or 0),
+        "at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+    })
+    idx.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+    return new_id
 
 
 def _lazy_ref_path(umo: str, image_id: int) -> str:
@@ -388,6 +442,15 @@ class ImageGenPlugin(Star):
         stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         path = self.image_dir / f"{stamp}_{result.seed}.png"
         path.write_bytes(result.image)
+        try:
+            img_id = _lazy_register(
+                getattr(event, "unified_msg_origin", "") or "",
+                str(path), result.width or width, result.height or height,
+            )
+            if img_id:
+                logger.info("[imggen] 出图登记为 #%s（之后「刚才那张」用它）", img_id)
+        except Exception:
+            logger.debug("[imggen] 登记到懒加载库失败", exc_info=True)
         logger.info(
             "[imggen] 出图完成 %s %sx%s seed=%s %.1fs -> %s",
             result.profile or profile or "default", width, height, result.seed,
@@ -500,12 +563,19 @@ class ImageGenPlugin(Star):
         """
         if not self._bool("enable_tool", True):
             return "生图功能当前已关闭，直接回答用户即可。"
+        umo = getattr(event, "unified_msg_origin", "") or ""
         refs = []
         if image_id:
-            picked = _lazy_ref_path(getattr(event, "unified_msg_origin", "") or "", image_id)
+            picked = _lazy_ref_path(umo, image_id)
             refs = [picked] if picked else []
         if not refs:
             refs = await self._collect_reference_images(event)
+        if not refs:
+            # 「刚才那张」「给它加景深」这类没带图也没编号的调图指令：默认改最近一张
+            latest = _lazy_latest_path(umo)
+            if latest:
+                refs = [latest]
+                logger.info("[imggen] 没指定图片，用最近一张 %s", Path(latest).name)
         if not refs:
             return "没找到要改的图：让用户先发一张图，或者引用那张图再试。"
         src = Path(refs[0])
