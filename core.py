@@ -22,10 +22,12 @@ from dataclasses import dataclass
 # 默认画质词。英文 tag 在多数模型上更稳，调用方可以在插件配置里整段替换。
 # 光影部分写得重一点：明显的光源方向、明暗对比、轮廓光、体积光、地面/物体投影。
 DEFAULT_POSITIVE = (
-    "masterpiece, best quality, ultra detailed, sharp focus, dramatic directional lighting, strong light and shadow contrast, cinematic chiaroscuro, clear key light from one side, crisp shadow edges, rim light, volumetric god rays, deep shadows with detail, bright specular highlights, warm-cool color contrast, high dynamic range, beautiful composition"
+    "masterpiece, best quality, ultra detailed, sharp focus, "
+    "cinematic lighting, beautiful composition, high dynamic range"
 )
 DEFAULT_NEGATIVE = (
-    "flat lighting, even lighting, washed out, overexposed, underexposed, low contrast, grey haze, muddy colors, lowres, blurry, jpeg artifacts, watermark, text, signature, logo, worst quality, low quality, deformed, bad anatomy, bad hands, extra fingers, cropped"
+    "lowres, blurry, jpeg artifacts, watermark, text, signature, logo, "
+    "worst quality, low quality, deformed, bad anatomy, bad hands, extra fingers, cropped"
 )
 
 
