@@ -61,9 +61,9 @@
   },
   "default_cfg": {
     "description": "默认 CFG",
-    "hint": "蒸馏/加速类模型靠 cfg=1 出图，此时反向提示词不参与计算；实测调到 3 会明显崩图，建议保持 1.0。普通模型可以试 5~7",
+    "hint": "0 = 用后端 profile 自己的 cfg（moss 2.5、turbo 系 1）；填正数则全局覆盖",
     "type": "float",
-    "default": 1.0
+    "default": 0
   },
   "max_prompt_chars": {
     "description": "提示词最大长度",
@@ -81,13 +81,13 @@
     "description": "正向画质提示词",
     "hint": "追加在 LLM 提示词后面，逗号分隔；已经包含的词不会重复添加",
     "type": "text",
-    "default": "masterpiece, best quality, ultra detailed, sharp focus, dramatic lighting, strong light and shadow contrast, cinematic chiaroscuro, clear key light from one direction, rim light, volumetric god rays, deep shadows with detail, soft light falloff, warm-cool color contrast, specular highlights, high dynamic range, beautiful composition"
+    "default": "masterpiece, best quality, ultra detailed, sharp focus, dramatic directional lighting, strong light and shadow contrast, cinematic chiaroscuro, clear key light from one side, crisp shadow edges, rim light, volumetric god rays, deep shadows with detail, bright specular highlights, warm-cool color contrast, high dynamic range, beautiful composition"
   },
   "quality_negative": {
     "description": "反向画质提示词",
     "hint": "作为 negative_prompt 送给接口。注意：cfg=1 的蒸馏模型不跑 CFG，反向词实际不参与采样，仅作兼容保留",
     "type": "text",
-    "default": "flat lighting, washed out, overexposed, underexposed, low contrast, muddy colors, lowres, blurry, jpeg artifacts, watermark, text, signature, logo, worst quality, low quality, deformed, bad anatomy, bad hands, extra fingers, cropped"
+    "default": "flat lighting, even lighting, washed out, overexposed, underexposed, low contrast, grey haze, muddy colors, lowres, blurry, jpeg artifacts, watermark, text, signature, logo, worst quality, low quality, deformed, bad anatomy, bad hands, extra fingers, cropped"
   },
   "enable_tool": {
     "description": "注册 generate_image 工具",
