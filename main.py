@@ -105,8 +105,8 @@ def _lazy_store_dir(umo: str) -> Path:
     return base / key
 
 
-def _lazy_latest_path(umo: str) -> str:
-    """懒加载库里最近一张图（通常是机器人刚发出去的那张）。"""
+def _lazy_latest_path(umo: str, uid: str = "") -> str:
+    """懒加载库里这个人的「刚才那张」：在他发的图和回给他的图里挑最新一张。"""
     sdir = _lazy_store_dir(umo)
     idx = sdir / "index.json"
     if not idx.is_file():
@@ -118,11 +118,16 @@ def _lazy_latest_path(umo: str) -> str:
     items = data.get("items") or []
     if not items:
         return ""
-    path = sdir / str(items[-1].get("file") or "")
+    picked = items[-1]
+    if uid:
+        mine = [it for it in items if str(it.get("uid") or "") == str(uid)]
+        if mine:
+            picked = mine[-1]
+    path = sdir / str(picked.get("file") or "")
     return str(path) if path.is_file() else ""
 
 
-def _lazy_register(umo: str, path: str, width: int = 0, height: int = 0) -> int:
+def _lazy_register(umo: str, path: str, width: int = 0, height: int = 0, uid: str = "") -> int:
     """把刚出的图登记进懒加载库，这样「刚才那张」有编号可用。返回编号，失败返回 0。"""
     src = Path(path)
     raw = src.read_bytes()
@@ -147,6 +152,7 @@ def _lazy_register(umo: str, path: str, width: int = 0, height: int = 0) -> int:
         "id": new_id, "file": name, "sha": sha,
         "w": int(width or 0), "h": int(height or 0),
         "at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "src": "bot", "uid": str(uid or ""),
     })
     idx.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
     return new_id
@@ -446,6 +452,7 @@ class ImageGenPlugin(Star):
             img_id = _lazy_register(
                 getattr(event, "unified_msg_origin", "") or "",
                 str(path), result.width or width, result.height or height,
+                str(getattr(event, "get_sender_id", lambda: "")() or ""),
             )
             if img_id:
                 logger.info("[imggen] 出图登记为 #%s（之后「刚才那张」用它）", img_id)
@@ -572,7 +579,7 @@ class ImageGenPlugin(Star):
             refs = await self._collect_reference_images(event)
         if not refs:
             # 「刚才那张」「给它加景深」这类没带图也没编号的调图指令：默认改最近一张
-            latest = _lazy_latest_path(umo)
+            latest = _lazy_latest_path(umo, str(getattr(event, "get_sender_id", lambda: "")() or ""))
             if latest:
                 refs = [latest]
                 logger.info("[imggen] 没指定图片，用最近一张 %s", Path(latest).name)
