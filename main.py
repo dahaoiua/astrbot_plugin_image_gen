@@ -74,13 +74,15 @@ T2I_SPEC = """【文生图提示词】（Qwen-Image 官方写法）
 - 用户明确要求的文字、数量、颜色、位置原样保留；没提到的背景、光线、氛围自己补合理值
 - 画面里要出现的具体文字用引号括起来并交代位置，例如：a cream headline at the top reads exactly "TAKE THE SCENIC ROUTE"
 - 比例属于 wh_ratio 字段，不要写进正文；也不要写分辨率
-- **光线必须写到能被画出来的程度**，每张图至少交代三件事：
-  1) 方位：from camera-left / side-lit / backlit / top light / window light from the right / bottom light
-  2) 软硬与色温：hard shadows / soft diffused light；warm golden hour / cool blue hour / mixed neon
-  3) 投影与明暗：long shadows stretching across the floor / deep shadows in the corners / high-key 或 low-key
-  例：warm window light from camera-left, hard shadows across the bed, bright rim light on her hair, low-key background
-- 禁止只写 "good lighting"、"cinematic lighting" 这类空话；有光就有影，明暗要成对比
-- 默认用定向光/硬光（single strong key light、crisp shadows），除非用户明确要柔光/阴天，不要默认写 soft diffused light
+
+- 光线占画面成败的一半，必须写到「能照着打光」的程度。先选定一个主光源，再逐项写：
+  1) 方向和范围：from camera-left / side-lit / backlit / top light / window light from the right
+  2) 光的软硬：hard light → shadows with crisp edges；soft light → gradual falloff（默认用硬光，除非用户要柔光/阴天）
+  3) 明暗怎么分：亮部照亮哪里、暗部占多少面积，例如 the left half of the room falls into deep shadow
+  4) 影子落在哪：long window-frame shadows stripe the floor and her sleeve
+  5) 高光与轮廓：a bright rim light along her hair and shoulder，specular highlight on the sill
+- 可以直接套的句式：A single hard shaft of late-afternoon sun cuts in from camera-right; sharp window-frame shadows stripe the floor and her sleeve; a bright rim light traces her hair and shoulder; the left side of the room falls into deep shadow, keeping the background low-key.
+- 禁止：只写 "good lighting"、"cinematic lighting" 这类空话；不给方向；默认写 soft diffused light 把画面磨平；同一句话里光源方向自相矛盾
 - 每个属性紧跟它描述的对象，不要堆到句尾
 - 要透明底时用固定句式：This is an RGBA image with transparency. [subject]. The image has alpha channel and the background is transparent.
 - 语言：{lang}"""
@@ -90,7 +92,7 @@ EDIT_SPEC = """【图生图提示词】（Qwen-Image 官方模板）
 Edit. [具体改动指令]. Requested change: [instruction]. Preserve unrelated content and the image's framing. Keep the subject's identity and visual style consistent.
 
 - 不要先描述成品画面；不要细写不需要改的部分
-- 改光影时同样写具体，别只说 brighter：例如 relight as warm side light from camera-right, push the room into low-key, keep a rim light on her shoulder
+- 改光影时同样写清方向、软硬和投影变化，别只说 brighter：例如 relight as warm side light from camera-right, let long shadows fall to the left, push the room into low-key, keep a rim light on her shoulder
 - 多张参考图时按顺序引用 first image / second image
 - 语言：{lang}"""
 
