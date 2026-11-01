@@ -137,8 +137,8 @@ git clone https://github.com/dahaoiua/astrbot_plugin_image_gen
 | `default_steps` | `0` | 0 = 用该模型自带步数；填了就全局覆盖 |
 | `default_cfg` | `1.0` | CFG，见下面的注意事项 |
 | `max_prompt_chars` | `1800` | 最终提示词长度上限（含画质词） |
-| `quality_enabled` | `true` | 是否追加内置画质词 |
-| `quality_positive` | 见 schema | 正向画质词 |
+| `quality_enabled` | `true` | 是否追加内置画质词（含光影强化：明暗对比/轮廓光/体积光/投影） |
+| `quality_positive` | 见 schema | 正向画质词，内置偏重光影；嫌太重就删掉相关的几条 |
 | `quality_negative` | 见 schema | 反向画质词 |
 | `enable_tool` | `true` | 注册 `generate_image` 工具 |
 | `inject_prompt` | `true` | 注入使用说明 |
