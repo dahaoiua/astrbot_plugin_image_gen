@@ -74,7 +74,12 @@ T2I_SPEC = """【文生图提示词】（Qwen-Image 官方写法）
 - 用户明确要求的文字、数量、颜色、位置原样保留；没提到的背景、光线、氛围自己补合理值
 - 画面里要出现的具体文字用引号括起来并交代位置，例如：a cream headline at the top reads exactly "TAKE THE SCENIC ROUTE"
 - 比例属于 wh_ratio 字段，不要写进正文；也不要写分辨率
-- 光影要写具体：光从哪来（窗光/侧逆光/顶光/霓虹）、强弱与色温、明暗对比、投影方向；只写 "good lighting" 等于没写
+- **光线必须写到能被画出来的程度**，每张图至少交代三件事：
+  1) 方位：from camera-left / side-lit / backlit / top light / window light from the right / bottom light
+  2) 软硬与色温：hard shadows / soft diffused light；warm golden hour / cool blue hour / mixed neon
+  3) 投影与明暗：long shadows stretching across the floor / deep shadows in the corners / high-key 或 low-key
+  例：warm window light from camera-left, hard shadows across the bed, bright rim light on her hair, low-key background
+- 禁止只写 "good lighting"、"cinematic lighting" 这类空话；有光就有影，明暗要成对比
 - 每个属性紧跟它描述的对象，不要堆到句尾
 - 要透明底时用固定句式：This is an RGBA image with transparency. [subject]. The image has alpha channel and the background is transparent.
 - 语言：{lang}"""
@@ -84,7 +89,7 @@ EDIT_SPEC = """【图生图提示词】（Qwen-Image 官方模板）
 Edit. [具体改动指令]. Requested change: [instruction]. Preserve unrelated content and the image's framing. Keep the subject's identity and visual style consistent.
 
 - 不要先描述成品画面；不要细写不需要改的部分
-- 改光影时点明光源和明暗关系，例如 side-lit by warm window light, deep shadows on the left
+- 改光影时同样写具体，别只说 brighter：例如 relight as warm side light from camera-right, push the room into low-key, keep a rim light on her shoulder
 - 多张参考图时按顺序引用 first image / second image
 - 语言：{lang}"""
 
@@ -129,7 +134,7 @@ REVERSE_INSTRUCTION = """你是文生图提示词工程师。看清楚这张图�
 - 开头句约 20 词：The image is a [vertical/wide/square] [realistic/cinematic/minimalist/...] [photograph/poster/illustration/...] of [subject], [background and palette].
 - 之后按序展开：medium → subject → action → relationships → composition → lighting → materials → exact lettering
 - 图里出现的具体文字用引号括起来并交代位置
-- 光影写清楚：光源方向、强弱、色温、投影落在哪里
+- 光影像照片一样交代清楚：光源从哪来、软硬和色温、影子落在哪里（例如 hard window light from the left, long shadows across the floor）
 - 不要堆关键词，不要写尺寸或分辨率
 - 语言：{lang}"""
 
