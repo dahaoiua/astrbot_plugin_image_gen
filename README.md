@@ -117,6 +117,7 @@ git clone https://github.com/dahaoiua/astrbot_plugin_image_gen
 | `qwen_image` | Qwen-Image 2.1 | 25 | 官方 25 步版本，中文语义最好 |
 | `qwen_turbo` | Qwen-Image 2.1 Turbo | 8（sigma 固定） | 蒸馏 UNet，比 25 步快 |
 | `moss` | MOSS-Image + 4 步蒸馏 LoRA | 4 | **默认模型**；中文理解好，尺寸按 16 对齐 |
+| `moss_kook` | MOSS + 4 步蒸馏 + KOOK-MOSS-SFT-观澜 风格 LoRA | 4 | 观澜画风；和 moss 同一套流程，多挂一层风格 LoRA |
 | `qwen_lora` | Qwen-Image 2.1 + 官方 turbo LoRA（文生图） | 8（sigma 固定） | 比 25 步版快，质量接近 |
 | `qwen_lora_edit` | 同上 + 参考图（图生图） | 8（sigma 固定） | 发图让它改图；出图尺寸跟随参考图，长边超过 1024 自动缩小 |
 
