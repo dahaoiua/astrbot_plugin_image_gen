@@ -80,6 +80,7 @@ T2I_SPEC = """【文生图提示词】（Qwen-Image 官方写法）
   3) 投影与明暗：long shadows stretching across the floor / deep shadows in the corners / high-key 或 low-key
   例：warm window light from camera-left, hard shadows across the bed, bright rim light on her hair, low-key background
 - 禁止只写 "good lighting"、"cinematic lighting" 这类空话；有光就有影，明暗要成对比
+- 默认用定向光/硬光（single strong key light、crisp shadows），除非用户明确要柔光/阴天，不要默认写 soft diffused light
 - 每个属性紧跟它描述的对象，不要堆到句尾
 - 要透明底时用固定句式：This is an RGBA image with transparency. [subject]. The image has alpha channel and the background is transparent.
 - 语言：{lang}"""
@@ -352,7 +353,12 @@ class ImageGenPlugin(Star):
         if steps is None:
             configured = self._int("default_steps", 0)
             steps = configured if configured > 0 else None
-        cfg_value = self._float("default_cfg", 1.0) if cfg is None else float(cfg)
+        # default_cfg 填 0 = 用后端 profile 自己的 cfg（moss 是 2.5，turbo 系是 1）
+        if cfg is None:
+            configured_cfg = self._float("default_cfg", 0.0)
+            cfg_value = configured_cfg if configured_cfg > 0 else None
+        else:
+            cfg_value = float(cfg)
         profile = (model or self._current_model(event) or "").strip().lower()
 
         client = self._client()
