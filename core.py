@@ -22,16 +22,10 @@ from dataclasses import dataclass
 # 默认画质词。英文 tag 在多数模型上更稳，调用方可以在插件配置里整段替换。
 # 光影部分写得重一点：明显的光源方向、明暗对比、轮廓光、体积光、地面/物体投影。
 DEFAULT_POSITIVE = (
-    "masterpiece, best quality, ultra detailed, sharp focus, "
-    "dramatic lighting, strong light and shadow contrast, cinematic chiaroscuro, "
-    "clear key light from one direction, rim light, volumetric god rays, "
-    "deep shadows with detail, soft light falloff, warm-cool color contrast, "
-    "specular highlights, high dynamic range, beautiful composition"
+    "masterpiece, best quality, ultra detailed, sharp focus, dramatic directional lighting, strong light and shadow contrast, cinematic chiaroscuro, clear key light from one side, crisp shadow edges, rim light, volumetric god rays, deep shadows with detail, bright specular highlights, warm-cool color contrast, high dynamic range, beautiful composition"
 )
 DEFAULT_NEGATIVE = (
-    "flat lighting, washed out, overexposed, underexposed, low contrast, muddy colors, "
-    "lowres, blurry, jpeg artifacts, watermark, text, signature, logo, "
-    "worst quality, low quality, deformed, bad anatomy, bad hands, extra fingers, cropped"
+    "flat lighting, even lighting, washed out, overexposed, underexposed, low contrast, grey haze, muddy colors, lowres, blurry, jpeg artifacts, watermark, text, signature, logo, worst quality, low quality, deformed, bad anatomy, bad hands, extra fingers, cropped"
 )
 
 
@@ -218,7 +212,7 @@ class ImageApiClient:
         width: int = 512,
         height: int = 512,
         steps: int | None = None,
-        cfg: float = 1.0,
+        cfg: float | None = None,
         seed: int | None = None,
         profile: str = "",
         image: str = "",
@@ -231,8 +225,9 @@ class ImageApiClient:
             "prompt": prompt,
             "width": int(width),
             "height": int(height),
-            "cfg": float(cfg),
         }
+        if cfg is not None:
+            params["cfg"] = float(cfg)
         if steps:
             params["steps"] = int(steps)
         if profile:
@@ -267,7 +262,7 @@ class ImageApiClient:
             width=int(headers.get("X-Width") or width),
             height=int(headers.get("X-Height") or height),
             steps=int(headers.get("X-Steps") or steps or 0),
-            cfg=float(cfg),
+            cfg=float(headers.get("X-Cfg") or cfg or 0.0),
             profile=headers.get("X-Profile") or profile,
             content_type=ctype or "image/png",
         )
