@@ -81,13 +81,13 @@
     "description": "正向画质提示词",
     "hint": "追加在 LLM 提示词后面，逗号分隔；已经包含的词不会重复添加",
     "type": "text",
-    "default": "masterpiece, best quality, ultra detailed, sharp focus, cinematic lighting, beautiful composition, high dynamic range"
+    "default": "masterpiece, best quality, ultra detailed, sharp focus, dramatic lighting, strong light and shadow contrast, cinematic chiaroscuro, clear key light from one direction, rim light, volumetric god rays, deep shadows with detail, soft light falloff, warm-cool color contrast, specular highlights, high dynamic range, beautiful composition"
   },
   "quality_negative": {
     "description": "反向画质提示词",
     "hint": "作为 negative_prompt 送给接口。注意：cfg=1 的蒸馏模型不跑 CFG，反向词实际不参与采样，仅作兼容保留",
     "type": "text",
-    "default": "lowres, blurry, jpeg artifacts, watermark, text, signature, logo, worst quality, low quality, deformed, bad anatomy, bad hands, extra fingers, cropped"
+    "default": "flat lighting, washed out, overexposed, underexposed, low contrast, muddy colors, lowres, blurry, jpeg artifacts, watermark, text, signature, logo, worst quality, low quality, deformed, bad anatomy, bad hands, extra fingers, cropped"
   },
   "enable_tool": {
     "description": "注册 generate_image 工具",
