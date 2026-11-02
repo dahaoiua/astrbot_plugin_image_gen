@@ -64,6 +64,7 @@ INJECT_COMMON = """【生图】可用 generate_image（文生图）和 edit_imag
 - 用户要「照着这张图 / 上一条图」画时，先调 describe_image_as_prompt 反推提示词，再把结果传给 generate_image；普通描述画图别多这一步。
 - 消息里的 [图#12] 表示一张存下来的图：要改它/照着它反推时，把 12 传给对应工具的 image_id。
 - 用户说「刚才那张」「这张图」或者直接下调图指令（加景深/压暗角/换背景/增强质感）时：调 edit_image 且**不要传 image_id**（默认改最近一张，也就是你刚发出去的那张）；只有用户明确指向更早的某张图时才用编号。
+- 分辨率只限长边，**比例由你按画面决定**，用 aspect 参数传：3:4 竖构图 / 2:3 人像 / 1:1 方图 / 3:2 横构图 / 16:9 宽屏；不要写进提示词。
 - negative_prompt 只放用户要求排除的元素。
 - 不传尺寸；不改模型；出图后一两句话衔接，不复述提示词。"""
 
@@ -336,23 +337,24 @@ class ImageGenPlugin(Star):
         except OSError:  # pragma: no cover
             logger.warning("[imggen] 保存会话设置失败", exc_info=True)
 
-    def _default_size(self) -> tuple[int, int]:
+    def _default_long_side(self) -> int:
         raw = self._str("default_size", "").strip()
         if raw:
-            return parse_size(raw)
-        return (
-            self._int("default_width", 512) or 512,
-            self._int("default_height", 512) or 512,
-        )
+            w, h = parse_size(raw)
+            return max(int(w), int(h))
+        return max(self._int("default_width", 1024), self._int("default_height", 1024), 256)
 
     def _current_model(self, event: AstrMessageEvent) -> str:
         ov = self._overrides.get(self._session_key(event)) or {}
         return str(ov.get("model") or self._str("default_model", "")).strip().lower()
 
-    def _current_size(self, event: AstrMessageEvent) -> tuple[int, int]:
+    def _current_long_side(self, event: AstrMessageEvent) -> int:
+        """会话的长边设置；比例由模型自己定，这里只管长边。"""
         ov = self._overrides.get(self._session_key(event)) or {}
-        raw = str(ov.get("size") or self._str("default_size", "")).strip()
-        return parse_size(raw) if raw else self._default_size()
+        raw = str(ov.get("long_side") or "").strip()
+        if raw.isdigit():
+            return max(256, int(raw))
+        return self._default_long_side()
 
     def _set_override(self, event: AstrMessageEvent, **kwargs) -> None:
         key = self._session_key(event)
@@ -382,6 +384,8 @@ class ImageGenPlugin(Star):
         model: str | None = None,
         size: tuple[int, int] | None = None,
         image: str = "",
+        aspect: str = "",
+        long_side: int | None = None,
     ) -> _GenOutcome:
         if not self._session_allowed(event):
             raise ImageApiError("这个会话没有开生图权限。")
@@ -404,11 +408,12 @@ class ImageGenPlugin(Star):
             quality_on,
         )
 
+        # 只限长边，比例交给模型/参数决定
+        side = int(long_side) if long_side else self._current_long_side(event)
         if size:
-            width, height = int(size[0]), int(size[1])
-        elif not (width and height):
-            width, height = self._current_size(event)
-        width, height = int(width or 512), int(height or 512)
+            side = max(int(size[0]), int(size[1]))
+        aspect_value = (aspect or "").strip().lower()
+        width = height = side
         if steps is None:
             configured = self._int("default_steps", 0)
             steps = configured if configured > 0 else None
@@ -435,6 +440,8 @@ class ImageGenPlugin(Star):
                     None,
                     profile,
                     image,
+                    aspect_value,
+                    side,
                 ),
                 timeout=timeout + 15,
             )
@@ -506,6 +513,7 @@ class ImageGenPlugin(Star):
         event: AstrMessageEvent,
         prompt: str,
         negative_prompt: str | None = None,
+        aspect: str = "",
         width: int | None = None,
         height: int | None = None,
         steps: int | None = None,
@@ -513,8 +521,9 @@ class ImageGenPlugin(Star):
         """根据文字描述用配置好的出图服务生成一张图片，并直接发给用户。
 
         Args:
-            prompt(string): 分层写的提示词短语（主体→外貌→服装→动作→环境→光影→镜头→画质），逗号分隔；以英文为主（Krea2 也允许中文文字），关键特征可用 (词:1.2) 权重
+            prompt(string): 按官方规范写的提示词（英文一段连贯描述，观察者视角）
             negative_prompt(string): 可选，需要避免出现在画面里的元素
+            aspect(string): 可选，画面比例，按内容自己选：3:4 竖构图 / 2:3 人像 / 1:1 方图 / 3:2 横构图 / 16:9 宽屏；不传默认 3:4
         """
         if not self._bool("enable_tool", True):
             return "生图功能当前已关闭，直接回答用户即可。"
@@ -529,6 +538,7 @@ class ImageGenPlugin(Star):
                 event,
                 prompt,
                 negative=negative_prompt,
+                aspect=aspect,
             )
         except ImageApiError as exc:
             logger.warning("[imggen] 工具出图失败：%s", exc)
@@ -599,6 +609,7 @@ class ImageGenPlugin(Star):
                 negative=negative_prompt,
                 model=profile,
                 image=data_uri,
+                aspect=aspect,
             )
         except ImageApiError as exc:
             logger.warning("[imggen] 图生图失败：%s", exc)
@@ -743,13 +754,13 @@ class ImageGenPlugin(Star):
         else:
             # 按当前会话的模型，只注入那一条语言规则（不混着说）
             model = self._current_model(event)
-            w, h = self._current_size(event)
+            side = self._current_long_side(event)
             label = MODEL_LABELS.get(model) or (model or "后端默认")
             rule = LANG_RULE
             t2i = self._spec_from_config("prompt_t2i", T2I_SPEC.format(lang=rule))
             edit = self._spec_from_config("prompt_edit", EDIT_SPEC.format(lang=rule))
             text = "\n\n".join([INJECT_COMMON, t2i, edit])
-            text += f"\n当前模型：{label}，{w}x{h}"
+            text += f"\n当前模型：{label}，长边 {side}"
         marker_on = self._bool("enable_marker", False)
         marker = self._str("marker_token", "[DRAW]").strip() or "[DRAW]"
         if marker_on and not custom:
@@ -863,26 +874,26 @@ class ImageGenPlugin(Star):
 
     @filter.command("draw_size", alias={"画图尺寸"})
     async def cmd_size(self, event: AstrMessageEvent, size: GreedyStr):
-        """查看或切换出图分辨率：/draw_size 1024x1024 / 16:9 / 768"""
+        """查看或设置长边：/draw_size 1024 / 768（比例由模型按画面决定）"""
         event.stop_event()
         arg = str(size or "").strip().lower().replace("×", "x").replace("：", ":")
-        cur_w, cur_h = self._current_size(event)
+        cur = self._current_long_side(event)
         if not arg:
             yield event.plain_result(
-                f"当前尺寸：{cur_w}x{cur_h}\n"
-                "可选：1024x1024 · 16:9 · 9:16 · 768 · default"
+                f"当前长边：{cur}（比例由模型按画面决定）\n可选：1024 · 768 · 1280 · default"
             )
             return
         if arg in ("default", "reset", "默认", "auto"):
-            self._set_override(event, size=None)
-            yield event.plain_result("已恢复默认尺寸。")
+            self._set_override(event, long_side=None)
+            yield event.plain_result("已恢复默认长边。")
             return
-        if not re.fullmatch(r"\d+(\.\d+)?([x:]\d+(\.\d+)?)?", arg):
-            yield event.plain_result(f"看不懂这个尺寸：{size}\n例子：1024x1024、16:9、768")
+        m = re.fullmatch(r"(\d+)(?:[x:](\d+))?", arg)
+        if not m:
+            yield event.plain_result(f"看不懂这个尺寸：{size}\n例子：1024、768（只设长边）")
             return
-        w, h = parse_size(arg)
-        self._set_override(event, size=f"{w}x{h}")
-        yield event.plain_result(f"已切换到 {w}x{h}。")
+        side = max(int(m.group(1)), int(m.group(2) or 0))
+        self._set_override(event, long_side=str(side), size=None)
+        yield event.plain_result(f"已把长边切到 {side}，比例仍由模型决定。")
 
     @filter.command("draw_cache")
     async def cmd_cache(self, event: AstrMessageEvent):
