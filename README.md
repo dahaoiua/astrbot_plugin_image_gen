@@ -106,9 +106,9 @@ git clone https://github.com/dahaoiua/astrbot_plugin_image_gen
 | `/draw 一只在雪地里的白狐，胶片质感` | 手动出图，绕过 LLM |
 | `/draw_model` | 看当前模型和可选项 |
 | `/draw_model krea2` | 切换本会话的模型（`zimage` / `krea2` / `qwen_image`，`default` 恢复配置默认） |
-| `/draw_size` | 看当前尺寸 |
-| `/draw_size 1024x768` | 切换本会话的分辨率，也支持 `16:9`、`9:16`、`1024`（正方形） |
-| `/draw_size default` | 恢复配置默认尺寸 |
+| `/draw_size` | 看当前长边（比例由模型定） |
+| `/draw_size 1024` | 设置本会话的长边（比例仍由模型按画面决定） |
+| `/draw_size default` | 恢复默认长边 |
 | `/draw_status` | 检查出图接口是否在线，顺带显示引擎版本和显存 |
 | `/draw_cache` | 清 ComfyUI 缓存：卸载模型释放显存 + 删残留的临时参考图 |
 
@@ -142,7 +142,7 @@ git clone https://github.com/dahaoiua/astrbot_plugin_image_gen
 | `api_timeout` | `300` | 接口超时（秒） |
 | `api_user` / `api_password` | 空 | 出图接口在公网域名后时的 Basic Auth |
 | `default_model` | `moss` | 默认模型；可填 `zimage`/`krea2`/`qwen_image`/`qwen_turbo`/`moss` |
-| `default_size` | `768x1024` | 默认尺寸，支持 `1024x1024`、`16:9`、`1024` |
+| `default_size` | `1024` | 默认尺寸，支持 `1024x1024`、`16:9`、`1024` |
 | `default_width` / `default_height` | `768` / `1024` | 仅当 `default_size` 留空时兜底 |
 | `default_steps` | `0` | 0 = 用该模型自带步数；填了就全局覆盖 |
 | `default_cfg` | `1.0` | CFG，见下面的注意事项 |
