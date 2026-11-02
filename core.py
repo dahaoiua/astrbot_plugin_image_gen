@@ -218,10 +218,13 @@ class ImageApiClient:
         seed: int | None = None,
         profile: str = "",
         image: str = "",
+        aspect: str = "",
+        long_side: int | None = None,
     ) -> GenResult:
         """出一张图，直接拿 PNG 字节（响应头里有 seed / prompt_id / duration / profile）。
 
         image 传入 data URI / base64 时会走 POST JSON（图生图），否则走原来的 GET。
+        传 long_side + aspect 时，由后端按长边和比例算宽高。
         """
         params = {
             "prompt": prompt,
@@ -238,6 +241,10 @@ class ImageApiClient:
             params["negative_prompt"] = negative
         if seed is not None:
             params["seed"] = int(seed)
+        if aspect:
+            params["aspect"] = aspect
+        if long_side:
+            params["long_side"] = int(long_side)
         if image:
             payload = dict(params)
             payload["image"] = image
