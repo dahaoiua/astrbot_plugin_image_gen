@@ -67,34 +67,31 @@ INJECT_COMMON = """【生图】可用 generate_image（文生图）和 edit_imag
 - negative_prompt 只放用户要求排除的元素。
 - 不传尺寸；不改模型；出图后一两句话衔接，不复述提示词。"""
 
-T2I_SPEC = """【文生图提示词】（Qwen-Image 官方写法）
-用一段连贯英文写「正在看着成品图的人」的描述，不是关键词堆砌，也不是对模型下指令。
+T2I_SPEC = """【文生图提示词】（Qwen-Image 官方改写规范，压缩版）
+你是在描述一张已经画好的图，不是在下指令：英文、现在时、第三人称，一次输出**一整段**连贯描述（约 20 句、400~500 词），短要求不等于写短。
 
-- 开头句（约 20 词）：The image is a [vertical/wide/square] [realistic/cinematic/minimalist/...] [photograph/poster/illustration/...] of [subject], [background and palette].
-- 之后按序展开：medium → subject → action → relationships → composition → lighting → materials → exact lettering
-- 用户明确要求的文字、数量、颜色、位置原样保留；没提到的背景、光线、氛围自己补合理值
-- 画面里要出现的具体文字用引号括起来并交代位置，例如：a cream headline at the top reads exactly "TAKE THE SCENIC ROUTE"
-- 比例属于 wh_ratio 字段，不要写进正文；也不要写分辨率
-
-- 光线占画面成败的一半，必须写到「能照着打光」的程度。先选定一个主光源，再逐项写：
-  1) 方向和范围：from camera-left / side-lit / backlit / top light / window light from the right
-  2) 光的软硬：hard light → shadows with crisp edges；soft light → gradual falloff（默认用硬光，除非用户要柔光/阴天）
-  3) 明暗怎么分：亮部照亮哪里、暗部占多少面积，例如 the left half of the room falls into deep shadow
-  4) 影子落在哪：long window-frame shadows stripe the floor and her sleeve
-  5) 高光与轮廓：a bright rim light along her hair and shoulder，specular highlight on the sill
-- 可以直接套的句式：A single hard shaft of late-afternoon sun cuts in from camera-right; sharp window-frame shadows stripe the floor and her sleeve; a bright rim light traces her hair and shoulder; the left side of the room falls into deep shadow, keeping the background low-key.
-- 禁止：只写 "good lighting"、"cinematic lighting" 这类空话；不给方向；默认写 soft diffused light 把画面磨平；同一句话里光源方向自相矛盾
-- 每个属性紧跟它描述的对象，不要堆到句尾
-- 要透明底时用固定句式：This is an RGBA image with transparency. [subject]. The image has alpha channel and the background is transparent.
+- 开头句（约 20 词，媒介不能省）：The image is a ⟨vertical/wide/square⟩ ⟨style⟩ ⟨photograph/poster/illustration/...⟩ of ⟨subject⟩, ⟨background and palette⟩.
+- 用户明确给的文字、对象、数量、颜色、位置必须原样保留；没提到的背景、光线、氛围由你补全并决定。
+- 走法二选一：主体填满画面 → 背景与虚化 → 姿态位置 → 头部面部 → 身体与衣物 → 手持物 → 边缘；画面分区（海报/版面/多区域）→ 背景 → 顶部 → 左中右 → 底部。
+- 约三分之一的句子用位置短语开头（On the right side of the frame, ... / In the upper-left corner, ...），让画面始终可定位。
+- 画面里的文字逐字写进双引号，交代位置、字重、颜色、大小；读不清的写 blurred / too small to read，不要编字。
+- 光影单独成句：光源、方向、软硬、以及留下的高光与影子（The lighting is ...）。默认写定向硬光（hard key light / crisp-edged shadows），除非用户要柔光、阴天、平光。
+- 结尾一句收整体：构图、配色、风格、氛围（The overall composition ...），只写这一句。
+- 质感要求：颜色带修饰词（deep navy、muted olive），材质写具体（brushed metal、coarse linen、weathered wood），枚举不概括，人物写可观察的外表，物体说类别不说品牌。
+- 禁止：分辨率、比例、masterpiece/8K 这类质量词、任何 "you/create/make sure" 式指令；拿不准的地方用 appears to be / likely 这种观察者口吻。
 - 语言：{lang}"""
 
-EDIT_SPEC = """【图生图提示词】（Qwen-Image 官方模板）
-第一句直接说改什么，动词点明对象与区域；保留项一句带过。直接套这个模板：
-Edit. [具体改动指令]. Requested change: [instruction]. Preserve unrelated content and the image's framing. Keep the subject's identity and visual style consistent.
+EDIT_SPEC = """【图生图提示词】（Qwen-Image 官方编辑规范，压缩版）
+写成一条可执行的编辑指令：英文、一段到底、动词开头，只输出指令本身。
 
-- 不要先描述成品画面；不要细写不需要改的部分
-- 改光影时同样写清方向、软硬和投影变化，别只说 brighter：例如 relight as warm side light from camera-right, let long shadows fall to the left, push the room into low-key, keep a rim light on her shoulder
-- 多张参考图时按顺序引用 first image / second image
+- 只改用户点名的那几个属性，而且改到位（弱到看不出变化等于没改）。
+- 其余一律保持：用**一句**总的保留句带过（keep everything else unchanged），不要逐个描写要保留的内容——写得越细越容易被改掉。
+- 身份是不变量：人物脸与可辨识配饰、产品外形与标记、原图的媒介风格（照片/动漫/插画/3D），除非用户明确要改。
+- 顺序：先说要改什么、改在哪里，再一句保留；不要先描述成品画面。
+- 文字逐字写进双引号；拿不准的字宁可不加。
+- 改光影写清方向、软硬和影子变化：relight as warm side light from camera-right, long shadows to the left, keep a rim light on her shoulder。
+- 多张参考图时按顺序写 first image / second image；不要用"图1/第一张"这种说法。
+- 禁止：分辨率、比例、质量词。
 - 语言：{lang}"""
 
 
@@ -712,6 +709,24 @@ class ImageGenPlugin(Star):
         logger.info("[imggen] 反推提示词：%s", text[:150])
         return f"反推出的提示词（直接作为 generate_image 的 prompt 传进去）：\n{text}"
 
+    def _spec_from_config(self, key: str, fallback: str) -> str:
+        """读提示词规则：留空用内置；@文件名 从插件目录读整份模板；否则当正文。"""
+        raw = self._str(key, "").strip()
+        if not raw:
+            return fallback
+        if raw.startswith("@"):
+            path = Path(raw[1:].strip())
+            if not path.is_absolute():
+                path = Path(__file__).parent / path
+            try:
+                text = path.read_text(encoding="utf-8").strip()
+                if text:
+                    return text
+            except OSError:
+                logger.warning("[imggen] 读不到提示词模板 %s，用内置", path)
+            return fallback
+        return raw
+
     # -------------------------------------------------------------- 提示词注入
     @filter.on_llm_request()
     async def inject_draw_hint(self, event: AstrMessageEvent, req) -> None:
@@ -731,8 +746,8 @@ class ImageGenPlugin(Star):
             w, h = self._current_size(event)
             label = MODEL_LABELS.get(model) or (model or "后端默认")
             rule = LANG_RULE
-            t2i = self._str("prompt_t2i", "").strip() or T2I_SPEC.format(lang=rule)
-            edit = self._str("prompt_edit", "").strip() or EDIT_SPEC.format(lang=rule)
+            t2i = self._spec_from_config("prompt_t2i", T2I_SPEC.format(lang=rule))
+            edit = self._spec_from_config("prompt_edit", EDIT_SPEC.format(lang=rule))
             text = "\n\n".join([INJECT_COMMON, t2i, edit])
             text += f"\n当前模型：{label}，{w}x{h}"
         marker_on = self._bool("enable_marker", False)
