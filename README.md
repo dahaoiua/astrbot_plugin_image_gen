@@ -54,6 +54,15 @@ traditional Chinese ink painting, misty morning light, ultra detailed, 8k
 - 成本：deepseek-flash 走推理，一次约 2.7k token / 10~17 秒；换非推理 VLM 会快很多
 ## 提示词规范（按 Qwen-Image 2.1 官方写法）
 
+内置的是**压缩版**规范（约 30 行，够用且便宜）。插件根目录还打包了官方完整模板：
+
+- `prompts/system_prompt_t2i.txt`（Image Prompt Rewriting Expert）
+- `prompts/system_prompt_edit.txt`（Edit Prompt Enhancer）
+
+想用完整版，把配置 `prompt_t2i` / `prompt_edit` 填成 `@prompts/system_prompt_t2i.txt` 这种形式即可（`@` 开头按插件目录解析文件）。注意：完整版注入约 2.8 万字符 ≈ 7000 token，**每次请求都会带**，只在真的需要严格八步流程时再开。
+
+
+
 文生图和图生图是两套写法，分别注入；配置里 `prompt_t2i` / `prompt_edit` 可以各自整段替换（留空=用内置）。
 
 文生图（generate_image）：
