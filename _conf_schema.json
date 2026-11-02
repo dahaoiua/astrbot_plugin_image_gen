@@ -37,15 +37,15 @@
   },
   "default_size": {
     "description": "默认尺寸",
-    "hint": "支持 768x1024、1024x1024、16:9、1024 这几种写法；聊天里用 /draw_size 临时切",
+    "hint": "只取长边（例如 1024 或 768x1024 都按 1024 算）；比例由模型按画面决定",
     "type": "string",
-    "default": "768x1024"
+    "default": "1024"
   },
   "default_width": {
     "description": "默认宽度",
-    "hint": "仅当「默认尺寸」留空时作为兜底",
+    "hint": "默认长边的兜底（default_size 没填时用）",
     "type": "int",
-    "default": 768
+    "default": 1024
   },
   "default_height": {
     "description": "默认高度",
