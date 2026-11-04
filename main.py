@@ -567,6 +567,7 @@ class ImageGenPlugin(Star):
         prompt: str,
         negative_prompt: str | None = None,
         image_id: int = 0,
+        aspect: str = "",
     ) -> str:
         """按用户的话改一张图（图生图）：用户发图后说「改成…」「换成…」「加个…」时用。
 
@@ -574,6 +575,7 @@ class ImageGenPlugin(Star):
             prompt(string): 具体怎么改，例如"把背景换成夜晚的街道""把裙子改成红色""给她加一顶帽子"
             negative_prompt(string): 可选，不要出现的元素
             image_id(int): 可选，消息里 [图#12] 的编号；改旧图时用它，不传就用当前消息/引用的图
+            aspect(string): 可选，输出比例，按内容自己选：3:4 / 2:3 / 1:1 / 3:2 / 16:9；不传默认 3:4
         """
         if not self._bool("enable_tool", True):
             return "生图功能当前已关闭，直接回答用户即可。"
