@@ -68,6 +68,8 @@ INJECT_COMMON = """【生图】可用 generate_image（文生图）和 edit_imag
   · 文生图（generate_image）：比例由你按画面决定，3:4 竖构图 / 2:3 人像 / 1:1 方图 / 3:2 横构图 / 16:9 宽屏。
   · 图生图（edit_image）：**默认保留原图比例**，不要传 aspect；只有用户明确要换比例（改成横版/竖版/方图）时才传。
 - 用户说「放大/超分/高清一点/4K/清晰点」时用 upscale_image（默认 4 倍，可传 scale），默认用最近一张或 [图#N]。
+- 画知名 IP 角色时（原神/星铁/初音/Fate 等）：提示词里角色部分**只写标准标签组合**「角色名 (作品名)」，例如 furina (genshin impact)、nahida (genshin impact)、hatsune miku；**不要自己描述外貌**，除非用户明确要求改外貌/服装。
+- IP 形象校对（配置开着时）：画 IP 角色调 generate_image 要传 ip_character=true，出图后**不会直接发**；先 view_image(编号) 看一眼，像就 send_image(编号) 发出去，不像才补外貌描述重画（最多重画一次），画对了再发。
 - negative_prompt 只放用户要求排除的元素。
 - 不传尺寸；不改模型；出图后一两句话衔接，不复述提示词。"""
 
@@ -517,6 +519,7 @@ class ImageGenPlugin(Star):
         prompt: str,
         negative_prompt: str | None = None,
         aspect: str = "",
+        ip_character: bool = False,
         width: int | None = None,
         height: int | None = None,
         steps: int | None = None,
@@ -527,6 +530,7 @@ class ImageGenPlugin(Star):
             prompt(string): 按官方规范写的提示词（英文一段连贯描述，观察者视角）
             negative_prompt(string): 可选，需要避免出现在画面里的元素
             aspect(string): 可选，画面比例，按内容自己选：3:4 竖构图 / 2:3 人像 / 1:1 方图 / 3:2 横构图 / 16:9 宽屏；不传默认 3:4
+            ip_character(bool): 画知名 IP 作品里的角色（原神/星铁/初音等）时传 true；开了形象校对就先不发送，交给 send_image
         """
         if not self._bool("enable_tool", True):
             return "生图功能当前已关闭，直接回答用户即可。"
@@ -551,6 +555,20 @@ class ImageGenPlugin(Star):
             logger.exception("[imggen] 工具出图异常")
             return f"生图异常：{exc}"
 
+        if ip_character and self._bool("ip_check_enabled", True):
+            # 形象校对：先不发，存进图库，交给模型看一眼再决定
+            iid = _lazy_register(
+                getattr(event, "unified_msg_origin", "") or "", str(outcome.path),
+                outcome.result.width, outcome.result.height,
+                str(getattr(event, "get_sender_id", lambda: "")() or ""),
+            )
+            logger.info("[imggen] IP 形象校对：先不发送，图#%s 等确认", iid)
+            return (
+                f"已生成但**没有发送**：图#{iid}（{outcome.result.width}x{outcome.result.height}）。\n"
+                f"先调 view_image({iid}) 看一眼：像这个角色就调 send_image({iid}) 发出去；"
+                "不像就补上外貌/服装描述重新 generate_image（ip_character=true），画对了再发。"
+            )
+
         try:
             await event.send(event.chain_result(self._image_components(outcome)))
         except Exception:  # pragma: no cover - 发图失败不影响文字回复
@@ -561,6 +579,26 @@ class ImageGenPlugin(Star):
             f"seed={outcome.result.seed}，耗时 {outcome.result.duration:.1f}s）。"
             "不要重复调用工具，用一两句话自然衔接即可。"
         )
+
+    @filter.llm_tool(name="send_image")
+    async def send_image_tool(self, event: AstrMessageEvent, image_id: int = 0) -> str:
+        """把已经生成但还没发出去的图发给用户（IP 形象校对通过后用它发送）。
+
+        Args:
+            image_id(int): 要发的图编号，比如 [图#12] 的 12；不传就发最近一张
+        """
+        umo = getattr(event, "unified_msg_origin", "") or ""
+        path = _lazy_ref_path(umo, image_id) if image_id else ""
+        if not path:
+            path = _lazy_latest_path(umo, str(getattr(event, "get_sender_id", lambda: "")() or ""))
+        if not path:
+            return "没找到这张图（可能已被清理），重新 generate_image 一张。"
+        try:
+            await event.send(event.chain_result([Image.fromFileSystem(path)]))
+        except Exception:  # pragma: no cover
+            logger.exception("[imggen] 发送图片失败")
+            return "发送失败，告诉用户稍后再试。"
+        return "已发送。用一两句话自然衔接即可，不要重复调用。"
 
     # ------------------------------------------------------ 图生图：改一张图
     @filter.llm_tool(name="edit_image")
