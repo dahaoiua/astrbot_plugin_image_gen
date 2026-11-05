@@ -67,6 +67,7 @@ INJECT_COMMON = """【生图】可用 generate_image（文生图）和 edit_imag
 - 分辨率只限长边（默认 1024），比例不进提示词，走 aspect 参数：
   · 文生图（generate_image）：比例由你按画面决定，3:4 竖构图 / 2:3 人像 / 1:1 方图 / 3:2 横构图 / 16:9 宽屏。
   · 图生图（edit_image）：**默认保留原图比例**，不要传 aspect；只有用户明确要换比例（改成横版/竖版/方图）时才传。
+- 用户说「放大/超分/高清一点/4K/清晰点」时用 upscale_image（默认 4 倍，可传 scale），默认用最近一张或 [图#N]。
 - negative_prompt 只放用户要求排除的元素。
 - 不传尺寸；不改模型；出图后一两句话衔接，不复述提示词。"""
 
@@ -631,6 +632,80 @@ class ImageGenPlugin(Star):
         return (
             f"已改好并发送图片（{outcome.result.width}x{outcome.result.height}，"
             f"耗时 {outcome.result.duration:.1f}s）。不要重复调用工具，用一两句话自然衔接即可。"
+        )
+
+    # ------------------------------------------------------ 放大：SeedVR2 超分
+    @filter.llm_tool(name="upscale_image")
+    async def upscale_image_tool(
+        self,
+        event: AstrMessageEvent,
+        image_id: int = 0,
+        scale: float = 0,
+    ) -> str:
+        """把图片放大（超分）。用户说「放大」「超分」「高清一点」「4K」时用。
+
+        Args:
+            image_id(int): 可选，消息里 [图#12] 的编号；不传就用最近一张（当前消息/引用/刚出的图）
+            scale(float): 可选，放大倍数，默认用配置（4 倍）；一般填 2 或 4
+        """
+        if not self._bool("enable_tool", True):
+            return "生图功能当前已关闭，直接回答用户即可。"
+        if not self._bool("upscale_enabled", True):
+            return "超分功能当前已关闭。"
+        umo = getattr(event, "unified_msg_origin", "") or ""
+        refs = []
+        if image_id:
+            picked = _lazy_ref_path(umo, image_id)
+            refs = [picked] if picked else []
+        if not refs:
+            refs = await self._collect_reference_images(event)
+        if not refs:
+            latest = _lazy_latest_path(umo, str(getattr(event, "get_sender_id", lambda: "")() or ""))
+            if latest:
+                refs = [latest]
+        if not refs:
+            return "没找到要放大的图：让用户先发一张，或者引用那张图再试。"
+
+        src = Path(refs[0])
+        try:
+            raw = src.read_bytes()
+        except OSError as exc:
+            return f"读不到图片：{exc}"
+        suffix = src.suffix.lower().lstrip(".") or "png"
+        mime = "jpeg" if suffix in ("jpg", "jpeg") else suffix
+        data_uri = f"data:image/{mime};base64," + base64.b64encode(raw).decode("ascii")
+
+        factor = float(scale) if scale else float(self._int("upscale_scale", 4) or 4)
+        factor = max(1.0, min(8.0, factor))
+        tile = self._int("upscale_tile", 512) or 512
+        overlap = self._int("upscale_overlap", 128) or 128
+        color = self._str("upscale_color", "lab") or "lab"
+        try:
+            result = await asyncio.to_thread(self._client().upscale, data_uri, factor, tile, overlap, color)
+        except ImageApiError as exc:
+            logger.warning("[imggen] 超分失败：%s", exc)
+            return f"放大失败：{src.name} → {exc}"
+        except Exception as exc:  # pragma: no cover
+            logger.exception("[imggen] 超分异常")
+            return f"放大异常：{exc}"
+
+        stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        out_path = self.image_dir / f"{stamp}_upscale.png"
+        out_path.write_bytes(result.image)
+        try:
+            _lazy_register(umo, str(out_path), result.width, result.height,
+                           str(getattr(event, "get_sender_id", lambda: "")() or ""))
+        except Exception:
+            logger.debug("[imggen] 超分结果登记失败", exc_info=True)
+
+        try:
+            await event.send(event.chain_result([Image.fromFileSystem(str(out_path))]))
+        except Exception:  # pragma: no cover
+            logger.exception("[imggen] 发送放大图失败")
+            return "图放大了但发送失败，告诉用户稍后再试。"
+        return (
+            f"已放大并发送：{result.width}x{result.height}（{factor:g} 倍，耗时 {result.duration:.1f}s）。"
+            "不要重复调用，用一两句话衔接即可。"
         )
 
     # ------------------------------------------------------ 反推：图 → 提示词
