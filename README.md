@@ -105,7 +105,7 @@ git clone https://github.com/dahaoiua/astrbot_plugin_image_gen
 
 1. 提示词里的角色部分**只写标准标签组合**：`furina (genshin impact)`、`nahida (genshin impact)`，不自己描述外貌（除非用户明确要求改外貌/服装）
 2. `generate_image(..., ip_character=true)` 出图后**先不发送**，把图存成 `[图#N]`
-3. 模型调 `view_image(N)` 看一眼：像 → `send_image(N)` 发出去；不像 → 补外貌描述重画一次，画对了再发
+3. 模型调 `view_image(N)` 看一眼：像 → `send_image(N)` 发出去；不像 → 补外貌描述重画一次，**重画那张直接发送，不再校对**
 
 关掉开关后恢复原行为（出图直接发送）。
 
