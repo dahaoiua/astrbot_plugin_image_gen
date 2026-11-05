@@ -151,6 +151,17 @@ def parse_size(text: str, default: tuple[int, int] = (512, 512),
         return default
 
 
+@dataclass
+class UpscaleResult:
+    """一次超分的结果。"""
+
+    image: bytes
+    width: int
+    height: int
+    duration: float
+    seed: int = 0
+    content_type: str = "image/png"
+
 class ImageApiClient:
     """调用出图接口（默认走 SSH 反向隧道：http://127.0.0.1:8190）。"""
 
@@ -200,6 +211,41 @@ class ImageApiClient:
         resp = self._open(f"{self.base_url}/profiles")
         with resp:
             return json.loads(resp.read().decode("utf-8"))
+
+    def upscale(
+        self,
+        image: str,
+        scale: float = 4.0,
+        tile_size: int = 512,
+        overlap: int = 128,
+        color: str = "lab",
+    ) -> UpscaleResult:
+        """调后端 /upscale 做超分，返回图片字节 + 实际尺寸。"""
+        payload = {
+            "image": image,
+            "scale": float(scale),
+            "tile_size": int(tile_size),
+            "overlap": int(overlap),
+            "color_correction": color or "lab",
+        }
+        resp = self._post_json("/upscale", payload, accept="image/png")
+        with resp:
+            body = resp.read()
+            headers = resp.headers
+            ctype = headers.get("Content-Type", "image/png")
+        if not body.startswith(b"\x89PNG") and ctype.startswith("application/json"):
+            try:
+                err = json.loads(body.decode("utf-8"))
+                raise ImageApiError(err.get("error") or "超分失败")
+            except json.JSONDecodeError as exc:
+                raise ImageApiError("超分接口返回了无法解析的内容") from exc
+        return UpscaleResult(
+            image=body,
+            width=int(headers.get("X-Width") or 0),
+            height=int(headers.get("X-Height") or 0),
+            duration=float(headers.get("X-Duration") or 0.0),
+            content_type=ctype or "image/png",
+        )
 
     def clear_cache(self) -> dict:
         """让后端清 ComfyUI 缓存：卸载模型 + 删残留的临时参考图（/cache/clear）。"""
