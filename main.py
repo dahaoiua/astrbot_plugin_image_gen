@@ -59,6 +59,9 @@ PLUGIN_NAME = "astrbot_plugin_image_gen"
 
 # 注入给 LLM 的使用说明。{lang} 按当前模型替换成唯一一条语言规则。
 # 文生图 / 图生图各有一套写法（可在配置里分别替换 prompt_t2i / prompt_edit）。
+IP_RULE = """- 画知名 IP 角色时（原神/星铁/初音/Fate 等）：提示词里角色部分**只写标准标签组合**「角色名 (作品名)」，例如 furina (genshin impact)、nahida (genshin impact)、hatsune miku；**不要自己描述外貌**，除非用户明确要求改外貌/服装。
+- IP 形象校对：画 IP 角色调 generate_image 要传 ip_character=true，**第一张不会直接发**；先 view_image(编号) 看一眼，像就 send_image(编号) 发出去；不像就补上外貌/服装描述重新 generate_image（ip_character=true）——重画那次会**直接发送**，不需要再校对。"""
+
 INJECT_COMMON = """【生图】可用 generate_image（文生图）和 edit_image（图生图改图）；一条回复最多一张。
 - 触发：用户要图、或明显需要配图时用 generate_image；用户发图后说"改成…""换成…""加个…"时用 edit_image。
 - 用户要「照着这张图 / 上一条图」画时，先调 describe_image_as_prompt 反推提示词，再把结果传给 generate_image；普通描述画图别多这一步。
@@ -68,8 +71,8 @@ INJECT_COMMON = """【生图】可用 generate_image（文生图）和 edit_imag
   · 文生图（generate_image）：比例由你按画面决定，3:4 竖构图 / 2:3 人像 / 1:1 方图 / 3:2 横构图 / 16:9 宽屏。
   · 图生图（edit_image）：**默认保留原图比例**，不要传 aspect；只有用户明确要换比例（改成横版/竖版/方图）时才传。
 - 用户说「放大/超分/高清一点/4K/清晰点」时用 upscale_image（默认 4 倍，可传 scale），默认用最近一张或 [图#N]。
-- 画知名 IP 角色时（原神/星铁/初音/Fate 等）：提示词里角色部分**只写标准标签组合**「角色名 (作品名)」，例如 furina (genshin impact)、nahida (genshin impact)、hatsune miku；**不要自己描述外貌**，除非用户明确要求改外貌/服装。
-- IP 形象校对（配置开着时）：画 IP 角色调 generate_image 要传 ip_character=true，**第一张不会直接发**；先 view_image(编号) 看一眼，像就 send_image(编号) 发出去；不像就补上外貌/服装描述重新 generate_image（ip_character=true）——重画那次会**直接发送**，不需要再校对。
+
+
 - negative_prompt 只放用户要求排除的元素。
 - 不传尺寸；不改模型；出图后一两句话衔接，不复述提示词。"""
 
@@ -892,7 +895,11 @@ class ImageGenPlugin(Star):
             rule = LANG_RULE
             t2i = self._spec_from_config("prompt_t2i", T2I_SPEC.format(lang=rule))
             edit = self._spec_from_config("prompt_edit", EDIT_SPEC.format(lang=rule))
-            text = "\n\n".join([INJECT_COMMON, t2i, edit])
+            parts = [INJECT_COMMON]
+            if self._bool("ip_check_enabled", False):
+                parts.append(IP_RULE)
+            parts += [t2i, edit]
+            text = "\n\n".join(parts)
             text += f"\n当前模型：{label}，长边 {side}"
         marker_on = self._bool("enable_marker", False)
         marker = self._str("marker_token", "[DRAW]").strip() or "[DRAW]"
