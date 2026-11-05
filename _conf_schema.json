@@ -29,6 +29,12 @@
     "type": "string",
     "default": "moss"
   },
+  "ip_check_enabled": {
+    "description": "IP 角色形象校对",
+    "hint": "开：画 IP 角色时先出图不发送，模型确认形象对了才发；关：照旧直接发送",
+    "type": "bool",
+    "default": true
+  },
   "edit_model": {
     "description": "图生图用的 profile",
     "hint": "用户发图让你改的时候用的后端 profile，默认 qwen_edit（图生图）",
