@@ -99,6 +99,14 @@ git clone https://github.com/dahaoiua/astrbot_plugin_image_gen
 
 插件目录里**没有** `requirements.txt`，因为它只用标准库。
 
+## 放大（SeedVR2 超分）
+
+工具 `upscale_image`：用户说「放大」「超分」「高清一点」「4K」时，把最近一张图（或 `[图#N]`）交给 SeedVR2 超分。
+
+- 默认 **4 倍**，输出长边上限 4096；768×1024 → 3072×4096，实测约 60 秒
+- 走分块（`tile_size` 512 / `overlap` 128），8G 显存也能跑
+- 参数都在配置里：`upscale_scale`、`upscale_tile`、`upscale_overlap`、`upscale_color`（lab/wavelet/adain/none）
+
 ## 命令
 
 | 命令 | 说明 |
