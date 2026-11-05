@@ -35,6 +35,36 @@
     "type": "string",
     "default": "qwen_edit"
   },
+  "upscale_enabled": {
+    "description": "启用放大/超分",
+    "hint": "开：用户说放大/超分时调 SeedVR2 出大图",
+    "type": "bool",
+    "default": true
+  },
+  "upscale_scale": {
+    "description": "默认放大倍数",
+    "hint": "默认 4 倍；输出长边上限 4096",
+    "type": "int",
+    "default": 4
+  },
+  "upscale_tile": {
+    "description": "分块大小",
+    "hint": "512 稳；显存吃紧可降到 384",
+    "type": "int",
+    "default": 512
+  },
+  "upscale_overlap": {
+    "description": "分块重叠",
+    "hint": "128 一般够；接缝明显就加到 192",
+    "type": "int",
+    "default": 128
+  },
+  "upscale_color": {
+    "description": "颜色校正",
+    "hint": "lab=最忠实 / wavelet=保留高频 / adain=最快 / none=不校正",
+    "type": "string",
+    "default": "lab"
+  },
   "default_size": {
     "description": "默认尺寸",
     "hint": "只取长边（例如 1024 或 768x1024 都按 1024 算）；比例由模型按画面决定",
