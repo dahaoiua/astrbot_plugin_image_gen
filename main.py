@@ -69,7 +69,7 @@ INJECT_COMMON = """【生图】可用 generate_image（文生图）和 edit_imag
   · 图生图（edit_image）：**默认保留原图比例**，不要传 aspect；只有用户明确要换比例（改成横版/竖版/方图）时才传。
 - 用户说「放大/超分/高清一点/4K/清晰点」时用 upscale_image（默认 4 倍，可传 scale），默认用最近一张或 [图#N]。
 - 画知名 IP 角色时（原神/星铁/初音/Fate 等）：提示词里角色部分**只写标准标签组合**「角色名 (作品名)」，例如 furina (genshin impact)、nahida (genshin impact)、hatsune miku；**不要自己描述外貌**，除非用户明确要求改外貌/服装。
-- IP 形象校对（配置开着时）：画 IP 角色调 generate_image 要传 ip_character=true，出图后**不会直接发**；先 view_image(编号) 看一眼，像就 send_image(编号) 发出去，不像才补外貌描述重画（最多重画一次），画对了再发。
+- IP 形象校对（配置开着时）：画 IP 角色调 generate_image 要传 ip_character=true，**第一张不会直接发**；先 view_image(编号) 看一眼，像就 send_image(编号) 发出去；不像就补上外貌/服装描述重新 generate_image（ip_character=true）——重画那次会**直接发送**，不需要再校对。
 - negative_prompt 只放用户要求排除的元素。
 - 不传尺寸；不改模型；出图后一两句话衔接，不复述提示词。"""
 
@@ -230,6 +230,8 @@ class ImageGenPlugin(Star):
         self._last_at: dict[str, float] = {}
         self._hits: dict[str, list[float]] = {}
         self._last_cleanup = 0.0
+        # IP 形象校对：同一轮只核一次
+        self._ip_checked: dict[str, float] = {}
         self._overrides_path = base / "sessions.json"
         self._overrides: dict[str, dict] = self._load_overrides()
 
@@ -391,12 +393,14 @@ class ImageGenPlugin(Star):
         image: str = "",
         aspect: str = "",
         long_side: int | None = None,
+        skip_cooldown: bool = False,
     ) -> _GenOutcome:
         if not self._session_allowed(event):
             raise ImageApiError("这个会话没有开生图权限。")
-        limited = self._rate_limited(event)
-        if limited:
-            raise ImageApiError(limited)
+        if not skip_cooldown:
+            limited = self._rate_limited(event)
+            if limited:
+                raise ImageApiError(limited)
 
         quality_on = self._bool("quality_enabled", True)
         final_prompt = compose_positive(
@@ -540,12 +544,24 @@ class ImageGenPlugin(Star):
                 "[imggen] 忽略模型给的尺寸/步数 width=%s height=%s steps=%s（由 /draw_size 控制）",
                 width, height, steps,
             )
+        umo_key = getattr(event, "unified_msg_origin", "") or ""
+        last_check = self._ip_checked.get(umo_key, 0.0)
+        # 同一轮只校对一次：重画那次直接发出去，不再核对
+        need_check = (
+            ip_character
+            and self._bool("ip_check_enabled", True)
+            and (time.time() - last_check > 180)
+        )
+        is_ip_retry = bool(ip_character) and 0 < (time.time() - last_check) <= 180
+        if need_check:
+            self._ip_checked[umo_key] = time.time()
         try:
             outcome = await self._generate(
                 event,
                 prompt,
                 negative=negative_prompt,
                 aspect=aspect,
+                skip_cooldown=is_ip_retry,
             )
         except ImageApiError as exc:
             logger.warning("[imggen] 工具出图失败：%s", exc)
@@ -555,7 +571,7 @@ class ImageGenPlugin(Star):
             logger.exception("[imggen] 工具出图异常")
             return f"生图异常：{exc}"
 
-        if ip_character and self._bool("ip_check_enabled", True):
+        if need_check:
             # 形象校对：先不发，存进图库，交给模型看一眼再决定
             iid = _lazy_register(
                 getattr(event, "unified_msg_origin", "") or "", str(outcome.path),
