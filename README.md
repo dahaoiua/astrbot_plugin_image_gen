@@ -113,7 +113,8 @@ git clone https://github.com/dahaoiua/astrbot_plugin_image_gen
 
 工具 `upscale_image`：用户说「放大」「超分」「高清一点」「4K」时，把最近一张图（或 `[图#N]`）交给 SeedVR2 超分。
 
-- 默认 **4 倍**，输出长边上限 4096；768×1024 → 3072×4096，实测约 60 秒
+- 默认 **2 倍**，模型可按用户要求传 2/3/4，硬上限 4 倍；输出长边上限 4096
+- 768×1024 实测：2 倍 → 1536×2048 约 20 秒；4 倍 → 3072×4096 约 70 秒
 - 走分块（`tile_size` 512 / `overlap` 128），8G 显存也能跑
 - 参数都在配置里：`upscale_scale`、`upscale_tile`、`upscale_overlap`、`upscale_color`（lab/wavelet/adain/none）
 
