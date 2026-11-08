@@ -215,7 +215,7 @@ class ImageApiClient:
     def upscale(
         self,
         image: str,
-        scale: float = 4.0,
+        scale: float = 2.0,
         tile_size: int = 512,
         overlap: int = 128,
         color: str = "lab",
