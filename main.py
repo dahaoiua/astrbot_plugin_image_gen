@@ -70,7 +70,7 @@ INJECT_COMMON = """【生图】可用 generate_image（文生图）和 edit_imag
 - 分辨率只限长边（默认 1024），比例不进提示词，走 aspect 参数：
   · 文生图（generate_image）：比例由你按画面决定，3:4 竖构图 / 2:3 人像 / 1:1 方图 / 3:2 横构图 / 16:9 宽屏。
   · 图生图（edit_image）：**默认保留原图比例**，不要传 aspect；只有用户明确要换比例（改成横版/竖版/方图）时才传。
-- 用户说「放大/超分/高清一点/4K/清晰点」时用 upscale_image（默认 4 倍，可传 scale），默认用最近一张或 [图#N]。
+- 用户说「放大/超分/高清一点/清晰点」时用 upscale_image：**默认 2 倍**，用户明确要更大、4K、拉到最大时才传 scale=4（上限 4 倍）；默认用最近一张或 [图#N]。
 
 
 - negative_prompt 只放用户要求排除的元素。
@@ -703,7 +703,7 @@ class ImageGenPlugin(Star):
 
         Args:
             image_id(int): 可选，消息里 [图#12] 的编号；不传就用最近一张（当前消息/引用/刚出的图）
-            scale(float): 可选，放大倍数，默认用配置（4 倍）；一般填 2 或 4
+            scale(float): 可选，放大倍数，默认 2 倍，最多 4 倍；只有用户明确要更大/4K 时才填 4
         """
         if not self._bool("enable_tool", True):
             return "生图功能当前已关闭，直接回答用户即可。"
@@ -732,8 +732,8 @@ class ImageGenPlugin(Star):
         mime = "jpeg" if suffix in ("jpg", "jpeg") else suffix
         data_uri = f"data:image/{mime};base64," + base64.b64encode(raw).decode("ascii")
 
-        factor = float(scale) if scale else float(self._int("upscale_scale", 4) or 4)
-        factor = max(1.0, min(8.0, factor))
+        factor = float(scale) if scale else float(self._int("upscale_scale", 2) or 2)
+        factor = max(1.0, min(4.0, factor))   # 上限 4 倍
         tile = self._int("upscale_tile", 512) or 512
         overlap = self._int("upscale_overlap", 128) or 128
         color = self._str("upscale_color", "lab") or "lab"
